@@ -77,7 +77,7 @@ std::shared_ptr<SockInfo> WebRtcPusher::getOriginSock(MediaSource &sender) const
 
 void WebRtcPusher::onRecvRtp(MediaTrack &track, const string &rid, RtpPacket::Ptr rtp, bool sorted) {
     if (!_simulcast) {
-        _push_src->onWrite(rtp, false, sorted);
+        _push_src->onWrite(std::move(rtp), false, sorted);
         return;
     }
 
@@ -98,7 +98,7 @@ void WebRtcPusher::onRecvRtp(MediaTrack &track, const string &rid, RtpPacket::Pt
                                             _push_src->isRecording(Recorder::type_mp4));
             src->setListener(static_pointer_cast<WebRtcPusher>(shared_from_this()));
         }
-        src->onWrite(rtp, false, sorted);
+        src->onWrite(std::move(rtp), false, sorted);
     }
 }
 
