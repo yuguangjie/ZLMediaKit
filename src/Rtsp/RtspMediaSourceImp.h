@@ -65,6 +65,18 @@ public:
         }
     }
 
+    void onWrite(RtpPacket::Ptr rtp, bool key_pos, bool sorted) {
+        if (sorted) {
+            //已经排序处理的rtp，仅用于解复用和转协议
+            if (!_all_track_ready || _muxer->isEnabled()) {
+                _demuxer->inputRtp(rtp);
+            }
+        } else {
+            //未排序的rtp, 关闭gop缓存，用于rtp直接转发
+            RtspMediaSource::onWrite(std::move(rtp), false);
+        }
+    }
+
     /**
      * 获取观看总人数，包括(hls/rtsp/rtmp)
      */
@@ -143,9 +155,9 @@ public:
     }
 
 private:
+    bool _all_track_ready = false;
     RtspDemuxer::Ptr _demuxer;
     MultiMediaSourceMuxer::Ptr _muxer;
-    bool _all_track_ready = false;
 };
 } /* namespace mediakit */
 

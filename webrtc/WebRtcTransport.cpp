@@ -504,11 +504,9 @@ SdpAttrCandidate::Ptr WebRtcTransportImp::getIceCandidate() const{
 
 class RtpChannel : public RtpTrackImp, public std::enable_shared_from_this<RtpChannel> {
 public:
-    RtpChannel(EventPoller::Ptr poller, RtpTrackImp::OnSorted cb, function<void(const FCI_NACK &nack)> on_nack) {
+    RtpChannel(EventPoller::Ptr poller, function<void(const FCI_NACK &nack)> on_nack) {
         _poller = std::move(poller);
         _on_nack = std::move(on_nack);
-        setOnSorted(std::move(cb));
-
         _nack_ctx.setOnNack([this](const FCI_NACK &nack) {
             onNack(nack);
         });
@@ -673,14 +671,18 @@ void WebRtcTransportImp::createRtpChannel(const string &rid, uint32_t ssrc, Medi
     //rid --> RtpReceiverImp
     auto &ref = track.rtp_channel[rid];
     weak_ptr<WebRtcTransportImp> weak_self = dynamic_pointer_cast<WebRtcTransportImp>(shared_from_this());
-    ref = std::make_shared<RtpChannel>(getPoller(), [&track, this, rid](RtpPacket::Ptr rtp) mutable {
-        onSortedRtp(track, rid, std::move(rtp));
-    }, [&track, weak_self, ssrc](const FCI_NACK &nack) mutable {
+    ref = std::make_shared<RtpChannel>(getPoller(), [&track, weak_self, ssrc](const FCI_NACK &nack) mutable {
         //nack发送可能由定时器异步触发
         auto strong_self = weak_self.lock();
         if (strong_self) {
             strong_self->onSendNack(track, nack, ssrc);
         }
+    });
+    ref->setOnSorted([&track, this, rid](RtpPacket::Ptr rtp) mutable {
+        onSortedRtp(track, rid, std::move(rtp));
+    });
+    ref->setBeforeSorted([&track, this, rid](const RtpPacket::Ptr &rtp) {
+        onBeforeSorted(track, rid, rtp);
     });
     InfoL << "create rtp receiver of ssrc:" << ssrc << ", rid:" << rid << ", codec:" << track.plan_rtp->codec;
 }
@@ -780,6 +782,10 @@ void WebRtcTransportImp::onSendTwcc(uint32_t ssrc, const string &twcc_fci) {
 
 ///////////////////////////////////////////////////////////////////
 
+void WebRtcTransportImp::onBeforeSorted(MediaTrack &track, const std::string &rid, const mediakit::RtpPacket::Ptr &rtp) {
+    onRecvRtp(track, rid, rtp, false);
+}
+
 void WebRtcTransportImp::onSortedRtp(MediaTrack &track, const string &rid, RtpPacket::Ptr rtp) {
     if (track.media->type == TrackVideo && _pli_ticker.elapsedTime() > 2000) {
         //定期发送pli请求关键帧，方便非rtc等协议
@@ -793,7 +799,7 @@ void WebRtcTransportImp::onSortedRtp(MediaTrack &track, const string &rid, RtpPa
         }
     }
 
-    onRecvRtp(track, rid, std::move(rtp));
+    onRecvRtp(track, rid, std::move(rtp), true);
 }
 
 ///////////////////////////////////////////////////////////////////

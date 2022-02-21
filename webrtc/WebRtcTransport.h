@@ -241,12 +241,13 @@ protected:
     void onCreate() override;
     void onDestory() override;
     void onShutdown(const SockException &ex) override;
-    virtual void onRecvRtp(MediaTrack &track, const std::string &rid, mediakit::RtpPacket::Ptr rtp) = 0;
+    virtual void onRecvRtp(MediaTrack &track, const std::string &rid, mediakit::RtpPacket::Ptr rtp, bool sorted) = 0;
     void updateTicker();
 
 private:
     SdpAttrCandidate::Ptr getIceCandidate() const;
     void onSortedRtp(MediaTrack &track, const std::string &rid, mediakit::RtpPacket::Ptr rtp);
+    void onBeforeSorted(MediaTrack &track, const std::string &rid, const mediakit::RtpPacket::Ptr &rtp);
     void onSendNack(MediaTrack &track, const mediakit::FCI_NACK &nack, uint32_t ssrc);
     void onSendTwcc(uint32_t ssrc, const std::string &twcc_fci);
 

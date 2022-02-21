@@ -14,7 +14,7 @@ using namespace std;
 using namespace mediakit;
 
 WebRtcPusher::Ptr WebRtcPusher::create(const EventPoller::Ptr &poller,
-                                       const RtspMediaSource::Ptr &src,
+                                       const RtspMediaSourceImp::Ptr &src,
                                        const std::shared_ptr<void> &ownership,
                                        const MediaInfo &info) {
     WebRtcPusher::Ptr ret(new WebRtcPusher(poller, src, ownership, info), [](WebRtcPusher *ptr) {
@@ -26,9 +26,10 @@ WebRtcPusher::Ptr WebRtcPusher::create(const EventPoller::Ptr &poller,
 }
 
 WebRtcPusher::WebRtcPusher(const EventPoller::Ptr &poller,
-                           const RtspMediaSource::Ptr &src,
+                           const RtspMediaSourceImp::Ptr &src,
                            const std::shared_ptr<void> &ownership,
                            const MediaInfo &info) : WebRtcTransportImp(poller) {
+    assert(src);
     _media_info = info;
     _push_src = src;
     _push_src_ownership = ownership;
@@ -74,10 +75,9 @@ std::shared_ptr<SockInfo> WebRtcPusher::getOriginSock(MediaSource &sender) const
     return static_pointer_cast<SockInfo>(getSession());
 }
 
-void WebRtcPusher::onRecvRtp(MediaTrack &track, const string &rid, RtpPacket::Ptr rtp) {
+void WebRtcPusher::onRecvRtp(MediaTrack &track, const string &rid, RtpPacket::Ptr rtp, bool sorted) {
     if (!_simulcast) {
-        assert(_push_src);
-        _push_src->onWrite(rtp, false);
+        _push_src->onWrite(rtp, false, sorted);
         return;
     }
 
@@ -91,15 +91,14 @@ void WebRtcPusher::onRecvRtp(MediaTrack &track, const string &rid, RtpPacket::Pt
         auto &src = _push_src_sim[rid];
         if (!src) {
             auto stream_id = rid.empty() ? _push_src->getId() : _push_src->getId() + "_" + rid;
-            auto src_imp = std::make_shared<RtspMediaSourceImp>(_push_src->getVhost(), _push_src->getApp(), stream_id);
-            _push_src_sim_ownership[rid] = src_imp->getOwnership();
-            src_imp->setSdp(_push_src->getSdp());
-            src_imp->setProtocolTranslation(_push_src->isRecording(Recorder::type_hls),
+            src = std::make_shared<RtspMediaSourceImp>(_push_src->getVhost(), _push_src->getApp(), stream_id);
+            _push_src_sim_ownership[rid] = src->getOwnership();
+            src->setSdp(_push_src->getSdp());
+            src->setProtocolTranslation(_push_src->isRecording(Recorder::type_hls),
                                             _push_src->isRecording(Recorder::type_mp4));
-            src_imp->setListener(static_pointer_cast<WebRtcPusher>(shared_from_this()));
-            src = src_imp;
+            src->setListener(static_pointer_cast<WebRtcPusher>(shared_from_this()));
         }
-        src->onWrite(std::move(rtp), false);
+        src->onWrite(rtp, false, sorted);
     }
 }
 
