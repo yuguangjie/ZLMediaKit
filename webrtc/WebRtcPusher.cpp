@@ -84,7 +84,7 @@ void WebRtcPusher::onRecvRtp(MediaTrack &track, const string &rid, RtpPacket::Pt
     if (rtp->type == TrackAudio) {
         //音频
         for (auto &pr : _push_src_sim) {
-            pr.second->onWrite(rtp, false);
+            pr.second->onWrite(rtp, false, sorted);
         }
     } else {
         //视频
