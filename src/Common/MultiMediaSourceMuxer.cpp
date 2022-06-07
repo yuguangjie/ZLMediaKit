@@ -306,6 +306,8 @@ bool MultiMediaSourceMuxer::onTrackReady(const Track::Ptr &track) {
             _audio_enc = nullptr;
             if (rtc) {
                 Track::Ptr newTrack(new OpusTrack());
+                GET_CONFIG(int, bitrate, General::kOpusBitrate);
+                newTrack->setBitRate(bitrate);
                 rtc->addTrack(newTrack);
                 rtc = nullptr;
 
@@ -330,6 +332,8 @@ bool MultiMediaSourceMuxer::onTrackReady(const Track::Ptr &track) {
             _audio_enc = nullptr;
             if (rtmp) {
                 Track::Ptr newTrack(new AACTrack(44100, 1));
+                GET_CONFIG(int, bitrate, General::kAacBitrate);
+                newTrack->setBitRate(bitrate);
                 rtmp->addTrack(newTrack);
                 rtmp = nullptr;
 

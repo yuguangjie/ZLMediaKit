@@ -67,6 +67,8 @@ const string kMaxStreamWaitTimeMS = GENERAL_FIELD"maxStreamWaitMS";
 const string kEnableVhost = GENERAL_FIELD"enableVhost";
 const string kAddMuteAudio = GENERAL_FIELD"addMuteAudio";
 const string kTranscodeAudio = GENERAL_FIELD"transcodeAudio";
+const string kOpusBitrate = GENERAL_FIELD"opusBitrate";
+const string kAacBitrate = GENERAL_FIELD"aacBitrate";
 const string kResetWhenRePlay = GENERAL_FIELD"resetWhenRePlay";
 const string kPublishToHls = GENERAL_FIELD"publishToHls";
 const string kPublishToMP4 = GENERAL_FIELD"publishToMP4";
@@ -92,6 +94,8 @@ static onceToken token([](){
     mINI::Instance()[kEnableVhost] = 0;
     mINI::Instance()[kAddMuteAudio] = 1;
     mINI::Instance()[kTranscodeAudio] = 1;
+    mINI::Instance()[kOpusBitrate] = 64000;
+    mINI::Instance()[kAacBitrate] = 64000;
     mINI::Instance()[kResetWhenRePlay] = 1;
     mINI::Instance()[kPublishToHls] = 1;
     mINI::Instance()[kPublishToMP4] = 0;

@@ -326,6 +326,12 @@ void installWebHook(){
                 if (obj.isMember("continue_push_ms")) {
                     option.continue_push_ms = obj["continue_push_ms"].asUInt();
                 }
+                if (obj.isMember("enable_rtc")) {
+                    option.enable_rtc = obj["enable_rtc"].asBool();
+                }
+                if (obj.isMember("audio_transcode")) {
+                    option.audio_transcode = obj["audio_transcode"].asBool();
+                }
                 invoker(err, option);
             } else {
                 //推流鉴权失败

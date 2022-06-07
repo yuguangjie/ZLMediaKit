@@ -165,6 +165,11 @@ extern const std::string kEnableVhost;
 extern const std::string kAddMuteAudio;
 //启用aac和opus音频自动转码
 extern const std::string kTranscodeAudio;
+// opus转码比例率
+extern const std::string kOpusBitrate;
+// aac 转码比例率
+extern const std::string kAacBitrate;
+
 //拉流代理时如果断流再重连成功是否删除前一次的媒体流数据，如果删除将重新开始，
 //如果不删除将会接着上一次的数据继续写(录制hls/mp4时会继续在前一个文件后面写)
 extern const std::string kResetWhenRePlay;
