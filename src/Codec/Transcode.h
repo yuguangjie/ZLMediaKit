@@ -62,6 +62,24 @@ private:
     SwrContext *_ctx = nullptr;
 };
 
+class FFmpegAudioFifo {
+public:
+    FFmpegAudioFifo() = default;
+    ~FFmpegAudioFifo();
+
+    bool Write(const AVFrame *frame);
+    bool Read(AVFrame *frame, int sample_size);
+    int size() const;
+
+private:
+    int _channels = 0;
+    int _samplerate = 0;
+    int64_t _tsp = 0;
+    float _timebase = 0;
+    AVAudioFifo *_fifo = nullptr;
+    AVSampleFormat _format = AV_SAMPLE_FMT_NONE;
+};
+
 class TaskManager {
 public:
     TaskManager() = default;
@@ -107,7 +125,7 @@ public:
     bool inputFrame(const Frame::Ptr &frame, bool live, bool async, bool enable_merge = true);
     void setOnDecode(onDec cb);
     void flush();
-    const AVCodecContext *getContext() const;
+    const AVCodecContext *getContext() const { return _context.get(); }
 
 private:
     void onDecode(const FFmpegFrame::Ptr &frame);
@@ -136,6 +154,41 @@ private:
     int _target_height;
     SwsContext *_ctx = nullptr;
     AVPixelFormat _target_format;
+};
+
+class FFmpegEncoder : public TaskManager, public CodecInfo {
+public:
+    using Ptr = std::shared_ptr<FFmpegEncoder>;
+    using onEnc = std::function<void(const Frame::Ptr &)>;
+
+    FFmpegEncoder(const Track::Ptr &track, int thread_num = 2);
+    ~FFmpegEncoder() override;
+
+    void flush();
+    CodecId getCodecId() const override { return _codecId; }
+    const AVCodecContext *getContext() const { return _context.get(); }
+
+    void setOnEncode(onEnc cb) { _cb = std::move(cb); }
+    bool inputFrame(const FFmpegFrame::Ptr &frame, bool async);
+
+private:
+    bool inputFrame_l(FFmpegFrame::Ptr frame);
+    bool encodeFrame(AVFrame *frame);
+    void onEncode(AVPacket *packet);
+    bool openVideoCodec(int width, int height, int bitrate, AVCodec *codec);
+    bool openAudioCodec(int samplerate, int channel, int bitrate, AVCodec *codec);
+
+private:
+    onEnc _cb;
+    CodecId _codecId;
+    AVCodec *_codec = nullptr;
+    AVDictionary *_dict = nullptr;
+    std::shared_ptr<AVCodecContext> _context;
+
+    std::unique_ptr<FFmpegSws> _sws;
+    std::unique_ptr<FFmpegSwr> _swr;
+    std::unique_ptr<FFmpegAudioFifo> _fifo;
+    bool var_frame_size = false;
 };
 
 }//namespace mediakit

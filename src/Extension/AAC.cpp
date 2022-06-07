@@ -18,8 +18,9 @@ using namespace toolkit;
 
 namespace mediakit{
 
+static unsigned const samplingFrequencyTable[16] = { 96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050, 16000, 12000, 11025, 8000, 7350, 0, 0, 0 };
+
 #ifndef ENABLE_MP4
-unsigned const samplingFrequencyTable[16] = { 96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050, 16000, 12000, 11025, 8000, 7350, 0, 0, 0 };
 
 class AdtsHeader{
 public:
@@ -241,6 +242,22 @@ AACTrack::AACTrack(const string &aac_cfg) {
     }
     _cfg = aac_cfg;
     onReady();
+}
+
+AACTrack::AACTrack(int sample_rate, int channel, int profile)
+    : _channel(channel)
+    , _sampleRate(sample_rate) {
+    uint8_t audioObjectType = profile; // +1;
+    int samplingFrequencyIndex = 0;
+    for (size_t i = 0; i < sizeof(samplingFrequencyTable) / sizeof(samplingFrequencyTable[0]); i++) {
+        if (samplingFrequencyTable[i] == (unsigned)sample_rate) {
+            samplingFrequencyIndex = i;
+            break;
+        }
+    }
+    _cfg.resize(2);
+    _cfg[0] = (audioObjectType << 3) | (samplingFrequencyIndex >> 1);
+    _cfg[1] = (samplingFrequencyIndex << 7) | (channel << 3);
 }
 
 const string &AACTrack::getAacCfg() const {

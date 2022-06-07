@@ -40,6 +40,7 @@ public:
      * @param aac_cfg aac配置信息
      */
     AACTrack(const std::string &aac_cfg);
+    AACTrack(int sample_rate, int channel, int profile = 1);
 
     /**
      * 获取aac 配置信息
