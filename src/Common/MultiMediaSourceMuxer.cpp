@@ -331,7 +331,7 @@ bool MultiMediaSourceMuxer::onTrackReady(const Track::Ptr &track) {
             _audio_dec = nullptr;
             _audio_enc = nullptr;
             if (rtmp) {
-                Track::Ptr newTrack(new AACTrack(44100, 1));
+                Track::Ptr newTrack(new AACTrack(44100, std::dynamic_pointer_cast<AudioTrack>(track)->getAudioChannel()));
                 GET_CONFIG(int, bitrate, General::kAacBitrate);
                 newTrack->setBitRate(bitrate);
                 rtmp->addTrack(newTrack);
