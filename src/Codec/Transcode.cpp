@@ -548,9 +548,11 @@ bool FFmpegAudioFifo::Write(const AVFrame *frame) {
     av_audio_fifo_write(_fifo, (void **)frame->data, frame->nb_samples);
     _samplerate = frame->sample_rate;
     _channels = frame->channels;
-    if (_tsp && _timebase == 0)
+    if (fabs(_timebase) < 1e-6 && _tsp) {
         _timebase = (frame->pts - _tsp) * 1.0f / frame->nb_samples;
-    _tsp = frame->pts;
+        TraceL << "set timebase " << _timebase;
+    }
+    _tsp = frame->pts + (int64_t)(_timebase * frame->nb_samples);
     return true;
 }
 
@@ -565,7 +567,7 @@ bool FFmpegAudioFifo::Read(AVFrame *frame, int sample_size) {
     frame->format = _format;
     frame->channel_layout = av_get_default_channel_layout(_channels);
     frame->sample_rate = _samplerate;
-    frame->pts = _tsp - fifo_size * _timebase;
+    frame->pts = _tsp - (int64_t)(_timebase * fifo_size);
     if (frame->pts < 0)
         frame->pts = 0;
 
@@ -914,10 +916,11 @@ bool FFmpegEncoder::inputFrame_l(FFmpegFrame::Ptr input) {
             input = _swr->inputFrame(input);
             frame = input->get();
             // 保证每次塞给解码器的都是一帧音频
-            if (_context->frame_size && frame->nb_samples != _context->frame_size) {
+            if (!var_frame_size && _context->frame_size && frame->nb_samples != _context->frame_size) {
                 // add this frame to _audio_buffer
                 if (!_fifo)
                     _fifo.reset(new FFmpegAudioFifo());
+                // TraceL << "in " << frame->pts;
                 _fifo->Write(frame);
                 FFmpegFrame audio_frame;
                 while (_fifo->Read(audio_frame.get(), _context->frame_size)) {
@@ -943,6 +946,7 @@ bool FFmpegEncoder::inputFrame_l(FFmpegFrame::Ptr input) {
 }
 
 bool FFmpegEncoder::encodeFrame(AVFrame *frame) {
+    // TraceL << "enc " << frame->pts;
     int ret = avcodec_send_frame(_context.get(), frame);
     if (ret < 0) {
         WarnL << "Error sending a frame " << frame->pts << " to the encoder: " << ffmpeg_err(ret);
@@ -959,6 +963,7 @@ bool FFmpegEncoder::encodeFrame(AVFrame *frame) {
             av_packet_free(&packet);
             return false;
         }
+        // TraceL << "out " << packet->pts << "," << packet->dts;
         onEncode(packet);
     }
     av_packet_free(&packet);
