@@ -919,6 +919,8 @@ void installWebApi() {
         getArgsValue(allArgs, "enable_hls", option.enable_hls);
         getArgsValue(allArgs, "enable_mp4", option.enable_mp4);
         getArgsValue(allArgs, "enable_rtsp", option.enable_rtsp);
+        getArgsValue(allArgs, "enable_rtc", option.enable_rtc);
+        getArgsValue(allArgs, "audio_transcode", option.audio_transcode);
         getArgsValue(allArgs, "enable_rtmp", option.enable_rtmp);
         getArgsValue(allArgs, "enable_ts", option.enable_ts);
         getArgsValue(allArgs, "enable_fmp4", option.enable_fmp4);
