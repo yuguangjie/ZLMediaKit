@@ -545,14 +545,27 @@ bool FFmpegAudioFifo::Write(const AVFrame *frame) {
             return false;
         }
     }
+    int fifo_size = av_audio_fifo_size(_fifo);
     av_audio_fifo_write(_fifo, (void **)frame->data, frame->nb_samples);
-    _samplerate = frame->sample_rate;
+
     _channels = frame->channels;
-    if (fabs(_timebase) < 1e-6 && _tsp) {
-        _timebase = (frame->pts - _tsp) * 1.0f / frame->nb_samples;
-        TraceL << "set timebase " << _timebase;
+    if (_samplerate != frame->sample_rate) {
+        _samplerate = frame->sample_rate;
+        // 假定传入frame的时间戳是以ms为单位的
+        _timebase = 1000.0 / _samplerate;
     }
-    _tsp = frame->pts + (int64_t)(_timebase * frame->nb_samples);
+    if (frame->pts != AV_NOPTS_VALUE) {
+        // 计算fifo audio第一个采样的时间戳
+        int64_t tsp = frame->pts - _timebase * fifo_size;
+        // flv.js和webrtc对音频时间戳增量有要求, rtc要求更加严格！
+        // 得尽量保证时间戳是按照sample_size累加，否则容易出现破音或杂音等问题
+        if (_tsp == AV_NOPTS_VALUE || abs(tsp - _tsp) > 500) {
+            InfoL << "reset base_tsp " << _tsp << "->" << tsp;
+            _tsp = tsp;
+        }
+    } else {
+        _tsp = AV_NOPTS_VALUE;
+    }
     return true;
 }
 
@@ -567,9 +580,11 @@ bool FFmpegAudioFifo::Read(AVFrame *frame, int sample_size) {
     frame->format = _format;
     frame->channel_layout = av_get_default_channel_layout(_channels);
     frame->sample_rate = _samplerate;
-    frame->pts = _tsp - (int64_t)(_timebase * fifo_size);
-    if (frame->pts < 0)
-        frame->pts = 0;
+    frame->pts = _tsp;
+    if (_tsp != AV_NOPTS_VALUE) {
+        // advance tsp by sampe_size
+        _tsp += sample_size * _timebase;
+    }
 
     int ret = av_frame_get_buffer(frame, 0);
     if (ret < 0) {
@@ -787,6 +802,9 @@ FFmpegEncoder::FFmpegEncoder(const Track::Ptr &track, int thread_num) {
         av_dict_set(&_dict, "threads", to_string(MIN(thread_num, thread::hardware_concurrency())).data(), 0);
     }
     av_dict_set(&_dict, "zerolatency", "1", 0);
+    if (strcmp(codec->name, "libx264") == 0 || strcmp(codec->name, "libx265") == 0) {
+        av_dict_set(&_dict, "preset", "ultrafast", 0);
+    }
 
     while (true) {
         bool ret = false;
@@ -842,6 +860,11 @@ bool FFmpegEncoder::openVideoCodec(int width, int height, int bitrate, AVCodec *
         // _context->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
         _context->width = width;
         _context->height = height;
+        // gop
+        _context->gop_size = 200;
+        // 禁用b帧
+        _context->max_b_frames = 0;
+        _context->has_b_frames = 0;
         InfoL << "openVideoCodec " << codec->name << " " << _context->width << "x" << _context->height;
         _context->pix_fmt = AV_PIX_FMT_YUV420P; // codec->pix_fmts[0];
         // sws_.reset(new FFmpegSws(_context->pix_fmt, _context->width, _context->height));
@@ -920,7 +943,7 @@ bool FFmpegEncoder::inputFrame_l(FFmpegFrame::Ptr input) {
                 // add this frame to _audio_buffer
                 if (!_fifo)
                     _fifo.reset(new FFmpegAudioFifo());
-                // TraceL << "in " << frame->pts;
+                // TraceL << "in " << frame->pts << ",samples " << frame->nb_samples;
                 _fifo->Write(frame);
                 FFmpegFrame audio_frame;
                 while (_fifo->Read(audio_frame.get(), _context->frame_size)) {
@@ -963,7 +986,7 @@ bool FFmpegEncoder::encodeFrame(AVFrame *frame) {
             av_packet_free(&packet);
             return false;
         }
-        // TraceL << "out " << packet->pts << "," << packet->dts;
+        // TraceL << "out " << packet->pts << "," << packet->dts << ", size: " << packet->size;
         onEncode(packet);
     }
     av_packet_free(&packet);

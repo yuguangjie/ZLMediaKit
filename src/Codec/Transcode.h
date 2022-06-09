@@ -74,8 +74,8 @@ public:
 private:
     int _channels = 0;
     int _samplerate = 0;
-    int64_t _tsp = 0;
-    float _timebase = 0;
+    int64_t _tsp = AV_NOPTS_VALUE;
+    double _timebase = 0;
     AVAudioFifo *_fifo = nullptr;
     AVSampleFormat _format = AV_SAMPLE_FMT_NONE;
 };
